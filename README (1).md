@@ -28,7 +28,7 @@ Tek dosyalı web arayüzü (HTML/JS), Python FastAPI sunucusu (`backend/server.p
 
 - **Sahte yapay zekâ:** İlk kodda Claude'un oyu basit bir `if-else`ti. Gerçek model için bir sunucu yazdık; API anahtarı tarayıcıya konamayacağı için ortam değişkeninde tutuldu.
 - **Regex yerine denetim:** Yönetmelik kontrolü yalnızca regex'le yapılıyordu. Yapay zekâ denetimini ekledik, regex'i ucuz ön filtre ve sunucu çökerse yedek olarak bıraktık.
-- **Android kurulumu:** Doğru şablonu (Empty Views Activity), `assets` klasörünü, internet iznini ve `usesCleartextTraffic` ayarını öğrendik. Emülatörde sunucuya `localhost` değil `10.0.2.2` ile ulaşılıyor. Emülatör ilk denemede 5 dakikada bağlanamadı, yeniden başlatınca açıldı.
+- **Android kurulumu:** Doğru şablonu (Empty Views Activity), `assets` klasörünü, internet iznini ve `usesCleartextTraffic` ayarını öğrendik. Emülatörde sunucuya `localhost` değil `10.0.2.2` ile ulaşılıyor. Emülatör ilk denemede "5 dakika içinde bağlanamadı" hatası verdi; Device Manager'daki üç nokta menüsünden **Cold Boot Now** seçeneğiyle sıfırdan başlatınca sorun çözüldü.
 - **GitHub:** Commit uyarılarını (8 uyarı) aştık, projeyi push ettik, Pages'i `master` / `root` olarak ayarlayıp web sürümünü yayınladık.
 
 ## Sınırlamalar
