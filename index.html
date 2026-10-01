@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"><title>Karar Deposu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f5;--card:#fff;--ink:#14213d;--mut:#5b6678;--line:#c9d1dc;--acc:#2a6f97;--yes:#2f855a;--no:#c0392b;--pen:#b7791f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1624;--card:#172033;--ink:#e6ebf4;--mut:#93a0b5;--line:#2b3750;--acc:#6db3dc;--yes:#58c08a;--no:#ef7a6c;--pen:#e0a64a}}
+:root[data-theme="dark"]{--bg:#0f1624;--card:#172033;--ink:#e6ebf4;--mut:#93a0b5;--line:#2b3750;--acc:#6db3dc;--yes:#58c08a;--no:#ef7a6c;--pen:#e0a64a}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .c{background:#172033}}
+h1,h2,h3{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;margin:0}
+header{padding:20px 16px 8px;max-width:900px;margin:auto}
+h1{font-size:34px;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--mut);max-width:60ch}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+main{max-width:900px;margin:auto;padding:0 16px 40px}
+nav button{border:0;background:none;font:inherit;padding:8px 12px;color:var(--mut);border-bottom:3px solid transparent;cursor:pointer}
+nav button.on{color:var(--ink);border-color:var(--acc);font-weight:500}
+.c{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:14px;margin:10px 0}
+.c.sub1{margin-left:22px;border-left:4px solid var(--acc)}
+button.b,select,input,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:6px 10px}
+button.b{cursor:pointer}button.b:hover{border-color:var(--acc)}button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.y{border-color:var(--yes);color:var(--yes)}button.n{border-color:var(--no);color:var(--no)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:10px;padding:1px 8px;color:var(--mut);margin-right:4px}
+.pen{border-color:var(--pen);color:var(--pen)}.ok{border-color:var(--yes);color:var(--yes)}
+.tl{height:8px;background:var(--line);border-radius:4px;overflow:hidden;display:flex;margin:6px 0}
+.tl i{display:block;height:100%}.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+label{display:block;font-size:13px;color:var(--mut);margin-top:8px}input,textarea,select{width:100%}
+.g label{display:inline-flex;gap:4px;margin-right:10px}.g input{width:auto}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--mut)}
+.mr{border-left:3px solid var(--pen);padding-left:10px;color:var(--mut);font-size:14px;margin:6px 0}
+.err{color:var(--no)}details summary{cursor:pointer;color:var(--mut)}
+</style></head><body>
+<header><h1>Karar Deposu</h1>
+<p class="sub">Konular depo gibidir, öneriler birer değişiklik teklifidir. Oylamayla kabul edilen karar deftere eklenir; hiçbir şey silinmez, yalnızca gizlenir.</p>
+<div class="bar"><span id="auth"></span></div>
+<nav><button data-t="k">Konular</button><button data-t="d">Delegasyon grafı</button><button data-t="l">Defter</button><button data-t="r">Kurallar</button></nav></header>
+<main id="m"></main>
+<script>
+// === AI sunucu adresi (Android emülatörde http://10.0.2.2:8000 kullan) ===
+const API=/KararDeposuApp/.test(navigator.userAgent)?'http://10.0.2.2:8000':'http://localhost:8000';
+const jpost=async(path,body)=>{const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()};
+// Yönetmelik denetimi: sunucu (LLM) varsa onu kullanır, yoksa geçer (yerel regex ön filtre zaten çalıştı)
+const regCheck=async(title,text)=>{try{return await jpost('/ai/regulation',{title,text})}catch(e){return{ok:true,offline:true}}};
+
+const H=s=>{let a=3735928559,b=1103547991;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677)}a=Math.imul(a^a>>>16,2246822507)^Math.imul(b^b>>>13,3266489909);b=Math.imul(b^b>>>16,2246822507)^Math.imul(a^a>>>13,3266489909);return(4294967296*(2097151&b)+(a>>>0)).toString(16)};
+let D,SC;const PAL=['#2a6f97','#2f855a','#b7791f','#8e44ad','#c0392b','#16a085'];
+const sync=()=>{D=S.domains.map(d=>d.n);SC=S.scopes},col=d=>PAL[Math.max(0,D.indexOf(d))%PAL.length],anc=d=>{const r=[];let x=S.domains.find(y=>y.n===d);while(x){r.push(x.n);x=x.p&&S.domains.find(y=>y.n===x.p)}return r};
+const BAD=/oy hakk[ıi]n[ıi]\s*(kald|sil)|defter\w*\s*sil|kimli[gğ]\w*\s*if[sş]a|azınlı[gğ]ı?\s*(sustur|yasakla)/i;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let S,F=null,tab='k',showHid=false;
+const now=()=>new Date().toISOString().slice(0,16).replace('T',' ');
+const save=()=>{try{localStorage.setItem('kd2',JSON.stringify(S))}catch(e){}};
+function add(type,msg){const p=S.ledger.length?S.ledger.at(-1).hash:'0',t=now();S.ledger.push({i:S.ledger.length,t,type,msg,prev:p,hash:H(p+type+msg+t)})}
+const U=id=>S.users.find(u=>u.id===id),T=id=>S.topics.find(t=>t.id===id),uid=()=>Math.random().toString(36).slice(2,8);
+// Karesel oylama: haftalık 100 puan, n oy = n²-1 puan (ilk oy bedava)
+const wk=()=>{const d=new Date(),j=new Date(d.getFullYear(),0,1);return d.getFullYear()+'-'+Math.floor(((d-j)/864e5+j.getDay())/7)};
+const credits=u=>{if(u.ai)return 0;if(!u.cr||u.cr.w!==wk())u.cr={w:wk(),left:100};return u.cr.left};
+function seed(){S={me:null,domains:[{n:'yazılım',p:null},{n:'spor',p:null},{n:'futbol',p:'spor'},{n:'basketbol',p:'spor'},{n:'kampüs',p:null}],scopes:{sınıf:.3,üni:.5,herkes:.6},users:[],topics:[],ledger:[]};
+[['u2','Ayşe','Kaya','ayse',['futbol','kampüs']],['u3','Can','Demir','can',['basketbol','yazılım']],['u4','Deniz','Arslan','deniz',['kampüs']],['u5','Claude','Yapay zekâ','claude-ai',[]],['u6','Elif','Şahin','elif',['yazılım','kampüs']]]
+.forEach(([id,name,surname,nick,interests])=>S.users.push({id,name,surname,nick,interests,del:{},ai:id==='u5',pw:H(uid()+uid()),birth:'',address:''}));
+U('u3').del.basketbol='u5';add('GENESIS','Defter başlatıldı');
+const mk=(id,title,domain,scope,parent,text)=>({id,title,domain,scope,parent,status:'açık',text,support:['u2','u3'],props:[],cm:[]});
+S.topics.push(mk('t1','Üniversiteye uçak indirme izni','kampüs','üni',null,'Kampüste uçak indirilmesine şu an izin yoktur.'),mk('t2','Pist yeri nerede olsun?','kampüs','üni','t1','Henüz karar yok.'),mk('t3','Haftalık spor tahminleri','spor','herkes',null,'Tahminler her pazartesi paylaşılır.'),mk('t4','Futbol tahminleri','futbol','herkes','t3','Hafta sonu maçları burada tartışılır.'),mk('t5','Basketbol tahminleri','basketbol','herkes','t3','Hafta içi maçları burada tartışılır.'));
+S.topics.forEach(t=>add('KONU',t.title+' yayınlandı'));
+S.topics[3].cm.push({by:'u2',x:'Bu hafta derbi var, tahmin açıyorum.',pub:true,t:now()});
+S.topics[0].props.push({id:'p1',type:'edit',by:'u2',payload:'Uçak yalnızca bahar şenliğinde ve kampüs dışındaki pistte inebilir.',anayasal:false,votes:{},status:'bekliyor'});save()}
+try{S=JSON.parse(localStorage.getItem('kd2'))}catch(e){}if(!S||!S.users||!S.domains)seed();sync();
+// oylama mantığı
+function voters(t){const A=anc(t.domain),el=S.users.filter(u=>t.scope==='herkes'||u.ai||u.interests.some(i=>A.includes(i))),ids=new Set(el.map(u=>u.id)),raw=u=>A.map(d=>u.del[d]).find(Boolean)||(u.allAI?'u5':null);
+const dl=u=>{const d=raw(u);return d&&ids.has(d)&&d!==u.id&&!raw(U(d))?d:null};
+const cnt={};el.forEach(u=>{const d=dl(u);if(d)cnt[d]=(cnt[d]||0)+1});const W={};el.forEach(u=>{if(!dl(u))W[u.id]=1+Math.min(10,cnt[u.id]||0)});return{W,dl,el}}
+function tally(p,t){const{W}=voters(t),tot=Object.values(W).reduce((a,b)=>a+b,0);let y=0,n=0,cb=0;for(const id in p.votes)if(W[id]){const e=W[id]+((p.votes[id].n||1)-1);cb+=W[id];p.votes[id].v?y+=e:n+=e}return{tot,y,n,cast:y+n,cb,q:SC[t.scope]*tot}}
+function resolve(p,t){const k=tally(p,t);if(k.cb<k.q||!k.cast)return;
+const ok=p.anayasal?k.y/k.cast>=2/3:k.y>k.n;p.status=ok?'kabul':'red';p.at=now();p.exp=new Date(Date.now()+90*864e5).toISOString().slice(0,10);
+const lose=Object.entries(p.votes).filter(([id,v])=>v.v!==ok&&voters(t).W[id]).map(([id,v])=>`${v.pub?U(id).nick:'Anonim'}${v.n>1?' (×'+v.n+' şiddet)':''}: ${v.r||'gerekçe yok'}`);
+p.minority=`Kaybeden taraf (${ok?k.n:k.y} ağırlık): ${lose.join(' | ')||'—'}. Otomatik kontrol (şablon): katılım ${k.cb}/${k.tot} (oy şiddeti yeter sayıya sayılmaz, yalnızca sonuca); ${p.anayasal?'2/3 eşiği uygulandı':'basit çoğunluk uygulandı'}; oy kullanmayan ${k.tot-k.cb} ağırlık kararı etkilemedi; karar ${p.exp} tarihinde yeniden oylanacak.`;
+if(ok){if(p.type==='edit')t.text=p.payload;if(p.type==='delete')t.status='gizli';if(p.type==='close')t.status='kapalı'}
+add(ok?'KABUL':'RED',`${t.title}: ${p.type} önerisi ${ok?'kabul edildi':'reddedildi'} (${k.y}-${k.n})`)}
+// eylemler
+function vote(pid,tid,v){const t=T(tid),p=t.props.find(x=>x.id===pid),me=S.me;if(!voters(t).W[me])return;const pv=document.getElementById('pv'+pid);const u=U(me),nn=Math.max(1,Math.min(10,Math.round(+(document.getElementById('n'+pid)||{}).value)||1)),cost=nn*nn-1;if(cost>credits(u))return;u.cr.left-=cost;p.votes[me]={v,r:(document.getElementById('r'+pid)||{}).value||'',pub:!pv||pv.checked,n:nn};add('OY',`${p.votes[me].pub?U(me).nick:'Anonim'} oy verdi (${pid})${nn>1?' ×'+nn+' şiddet, '+cost+' puan':''}`);resolve(p,t);save();R()}
+function support(tid){const t=T(tid);if(t.support.includes(S.me))return;t.support.push(S.me);if(t.support.length>=2){t.status='açık';add('KONU',t.title+' yeterli destekle yayınlandı')}save();R()}
+const sim=(a,b)=>{const x=new Set(a.toLowerCase().split(/\W+/)),y=new Set(b.toLowerCase().split(/\W+/));return[...x].filter(w=>y.has(w)).length/new Set([...x,...y]).size};
+async function go(){const v=i=>(document.getElementById(i)||{}).value||'',e=document.getElementById('err');const bad=m=>{e.textContent=m;return};
+if(F.k==='login'){const u=S.users.find(x=>x.nick===v('ln')&&!x.ai);if(!u||u.pw!==H(v('lp')))return bad('Takma ad veya şifre yanlış.');S.me=u.id;F=null;save();R();return}
+if(F.k==='reg'){if(!['n','s','b','a','nk','pw'].every(i=>v(i).trim()))return bad('Tüm alanlar zorunlu.');if(S.users.some(u=>u.nick===v('nk')))return bad('Bu takma ad alınmış.');
+const id='u'+uid();S.users.push({id,name:v('n'),surname:v('s'),birth:v('b'),address:v('a'),nick:v('nk'),pw:H(v('pw')),interests:D.filter(d=>document.getElementById('i'+d).checked),del:{},ai:false});S.me=id;add('KULLANICI',v('nk')+' katıldı')}
+else if(F.k==='topic'){const ti=v('ti').trim(),tx=v('tx').trim();if(!ti||!tx)return bad('Başlık ve metin zorunlu.');if(BAD.test(ti+tx))return bad('Yönetmeliğe aykırı: temel hakları kaldıran içerik kabul edilmez.');
+const dup=S.topics.find(t=>t.status!=='gizli'&&sim(t.title,ti)>.5);if(dup&&!F.ok){F.ok=1;return bad(`Benzer konu var: "${dup.title}". Yine de açmak için tekrar bas (birleştirme önerilir).`)}
+bad('Yapay zekâ yönetmelik denetimi yapıyor…');const chk=await regCheck(ti,tx);if(!chk.ok)return bad(`Yönetmeliğe aykırı (madde ${chk.rule||'?'}): ${chk.reason}`);
+let dm=v('dm'),sc=v('sc');const nd=v('nd').trim().toLowerCase(),ns=v('ns').trim().toLowerCase();
+if(nd){if(!D.includes(nd)){S.domains.push({n:nd,p:v('dp')||null});U(S.me).interests.push(nd);add('ALAN',nd+' alanı eklendi'+(v('dp')?' ('+v('dp')+' alt dalı)':''))}dm=nd}
+if(ns){if(!SC[ns]){S.scopes[ns]=Math.min(1,Math.max(.05,(+v('nq')||50)/100));add('ETKİ',ns+' etki alanı eklendi')}sc=ns}
+sync();S.topics.push({id:'t'+uid(),title:ti,domain:dm,scope:sc,parent:F.tid||null,status:'taslak',text:tx,support:[S.me],props:[],cm:[]});add('KONU',ti+' taslak olarak açıldı')}
+else{const t=T(F.tid),tx=v('tx').trim();if(F.k==='edit'&&(tx.length<5||BAD.test(tx)))return bad(BAD.test(tx)?'Yönetmeliğe aykırı: temel hakları kaldıran içerik kabul edilmez.':'Metin çok kısa.');
+if(F.k==='edit'){bad('Yapay zekâ yönetmelik denetimi yapıyor…');const chk=await regCheck(t.title,tx);if(!chk.ok)return bad(`Yönetmeliğe aykırı (madde ${chk.rule||'?'}): ${chk.reason}`)}
+t.props.push({id:'p'+uid(),type:F.k,by:S.me,payload:tx,anayasal:document.getElementById('an').checked,votes:{},status:'bekliyor'});add('ÖNERİ',`${t.title}: ${F.k} önerildi`)}
+F=null;save();R()}
+function deleg(d,to){U(S.me).del[d]=to||undefined;if(!to)delete U(S.me).del[d];add('DELEGASYON',`${U(S.me).nick} → ${to?U(to).nick:'(geri aldı)'} [${d}]`);save();R()}
+// görünüm
+const chip=(s,c='')=>`<span class="chip ${c}">${esc(s)}</span>`;
+function formHTML(){if(!F)return'';const f=F.k,x=(b)=>`<div class="c"><div id="err" class="err"></div>${b}<div class="row"><button class="b p" onclick="go()">Gönder</button><button class="b" onclick="F=null;R()">Vazgeç</button></div></div>`;
+if(f==='login')return x(`<h3>Giriş</h3><label>Takma ad</label><input id="ln" autocomplete="username"><label>Şifre</label><input id="lp" type="password" autocomplete="current-password"><p class="sub">Başkasının hesabına giremezsin; demo kullanıcıların şifresi bilinmiyor. Bu demo tarayıcıda çalışır, gerçek güvenlik için sunucu gerekir.</p>`);
+if(f==='reg')return x(`<h3>Kayıt</h3><label>Ad</label><input id="n"><label>Soyad</label><input id="s"><label>Doğum tarihi</label><input id="b" type="date"><label>Adres</label><input id="a"><label>Takma ad</label><input id="nk"><label>Şifre (tarayıcıda özetlenir, düz metin saklanmaz)</label><input id="pw" type="password"><label>İlgi alanları</label><div class="g">${D.map(d=>`<label><input type="checkbox" id="i${d}">${d}</label>`).join('')}</div>`);
+if(f==='topic'){const pd=F.tid?T(F.tid).domain:'',op=D.map(d=>`<option ${d===pd?'selected':''}>${d}</option>`).join('');return x(`<h3>${F.tid?'Alt konu aç':'Yeni konu'}</h3><label>Başlık</label><input id="ti"><label>Alan</label><select id="dm">${op}</select><label>Ya da yeni alan ekle (üst alan seçersen alt dalı olur)</label><div class="row"><input id="nd" placeholder="Yeni alan adı" style="flex:2"><select id="dp" style="flex:1"><option value="">Üst alan yok</option>${D.map(d=>`<option>${d}</option>`).join('')}</select></div><label>Etki alanı (kime dokunuyor?)</label><select id="sc">${Object.keys(SC).map(k=>`<option ${k==='üni'?'selected':''}>${k}</option>`).join('')}</select><label>Ya da yeni etki alanı ekle (yeter sayı %)</label><div class="row"><input id="ns" placeholder="Etki alanı adı" style="flex:2"><input id="nq" type="number" min="5" max="100" value="50" style="flex:1"></div><label>Başlangıç metni</label><textarea id="tx" rows="3"></textarea><p class="sub">2 destekçi bulunca konu yayınlanır. Yeni alan ve etki alanı konu açılınca listeye eklenir.</p>`)}
+return x(`<h3>${{edit:'Düzenleme',delete:'Silme (gizleme)',close:'Kapatma'}[f]} önerisi</h3><label>${f==='edit'?'Yeni karar metni':'Gerekçe'}</label><textarea id="tx" rows="3"></textarea><label><input type="checkbox" id="an" style="width:auto"> Temel haklara dokunur (anayasal: 2/3 gerekir)</label>`)}
+function topicHTML(t,dep){if(t.status==='gizli'&&!showHid)return'';const{W,dl}=voters(t),me=S.me,kids=S.topics.filter(x=>x.parent===t.id);
+let h=`<div class="c ${dep?'sub1':''}"><h3>${esc(t.title)}</h3><div class="row">${chip(anc(t.domain).reverse().join(' › '))}${chip('etki: '+t.scope)}${chip(t.status,t.status==='açık'?'ok':t.status==='taslak'?'pen':'')}</div><p>${esc(t.text)}</p>`;
+if(t.status==='taslak')h+=`<div>Destek: ${t.support.length}/2 <button class="b" onclick="support('${t.id}')" ${t.support.includes(me)?'disabled':''}>Destekle</button></div>`;
+else if(t.status==='açık')h+=`<div class="row"><button class="b" onclick="F={k:'edit',tid:'${t.id}'};R()">Düzenleme öner</button><button class="b" onclick="F={k:'delete',tid:'${t.id}'};R()">Silme öner</button><button class="b" onclick="F={k:'close',tid:'${t.id}'};R()">Kapatma öner</button><button class="b" onclick="F={k:'topic',tid:'${t.id}'};R()">Alt konu</button></div>`;
+t.props.filter(p=>p.status==='bekliyor').forEach(p=>{const k=tally(p,t),den=Math.max(k.tot,k.cast),yp=den?k.y/den*100:0,np=den?k.n/den*100:0,left=credits(U(me)),mx=Math.min(10,Math.floor(Math.sqrt(left+1))),mine=W[me],d=dl(U(me));
+h+=`<div class="c" style="background:transparent"><b>${{edit:'Düzenleme',delete:'Silme',close:'Kapatma'}[p.type]}</b> önerisi — ${esc(U(p.by).nick)} ${p.anayasal?chip('2/3 gerekli','pen'):''}<div>${esc(p.payload)}</div><div class="tl"><i style="width:${yp}%;background:var(--yes)"></i><i style="width:${np}%;background:var(--no)"></i></div><div class="sub">Evet ${k.y} · Hayır ${k.n} · Katılım ${k.cb}/${k.tot} (yeter sayı ${k.q.toFixed(1)})</div><div class="sub">Oylar: ${vl(p)}</div>`;
+h+=p.votes[me]?`<div>Oyun kayıtlı.</div>`:mine?`<input id="r${p.id}" placeholder="Gerekçe (karşı oyda azınlık raporuna girer)"><label><input type="checkbox" id="pv${p.id}" checked style="width:auto"> Oyum adımla görünsün (kapatırsan anonim)</label><label>Oy şiddeti: <b id="nv${p.id}">1</b> oy · maliyet <b id="nc${p.id}">0</b> puan (kalan ${left}/100)</label><input type="range" id="n${p.id}" min="1" max="${mx}" value="1" oninput="document.getElementById('nv${p.id}').textContent=this.value;document.getElementById('nc${p.id}').textContent=this.value*this.value-1"><div class="row"><button class="b y" onclick="vote('${p.id}','${t.id}',true)">Evet (ağırlık ${mine})</button><button class="b n" onclick="vote('${p.id}','${t.id}',false)">Hayır</button></div>`:d?`<div>Oyunu ${esc(U(d).nick)} kullanıyor (devredildi).</div>`:`<div class="err">Bu konuda oy hakkın yok (ilgi alanın değil).</div>`;h+='</div>'});
+h+=comHTML(t);const dn=t.props.filter(p=>p.status!=='bekliyor');if(dn.length)h+=`<details><summary>Karar geçmişi (${dn.length})</summary>${dn.map(p=>`<div class="c" style="background:transparent">${chip(p.status,p.status==='kabul'?'ok':'')} ${p.type} · ${p.at}${p.status==='kabul'?' · sona erme '+p.exp:''}<div>${esc(p.payload)}</div><div class="mr"><b>Azınlık raporu:</b> ${esc(p.minority)}</div></div>`).join('')}</details>`;
+return h+'</div>'+kids.map(c=>topicHTML(c,1)).join('')}
+function graph(){const n=S.users.length,R0=120,pos={};S.users.forEach((u,i)=>{const a=i/n*2*Math.PI-Math.PI/2;pos[u.id]=[170+R0*Math.cos(a)*1.25,150+R0*Math.sin(a)]});let s='<svg viewBox="0 0 340 300" style="width:100%;max-width:520px"><defs><marker id="ar" markerWidth="8" markerHeight="8" refX="14" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="context-stroke"/></marker></defs>';
+S.users.forEach(u=>Object.entries(u.del).concat(u.allAI?[['tümü','u5']]:[]).forEach(([d,to])=>{if(pos[to])s+=`<line x1="${pos[u.id][0]}" y1="${pos[u.id][1]}" x2="${pos[to][0]}" y2="${pos[to][1]}" stroke="${col(d)}" stroke-width="2" marker-end="url(#ar)"/>`}));
+S.users.forEach(u=>{const[x,y]=pos[u.id];s+=`<circle cx="${x}" cy="${y}" r="13" fill="${u.ai?'var(--acc)':'var(--card)'}" stroke="var(--ink)" stroke-width="${u.id===S.me?3:1}"/><text x="${x}" y="${y+27}" text-anchor="middle" font-size="11" fill="var(--ink)">${esc(u.nick)}</text>`});return s+'</svg>'}
+function R(){sync();document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+document.getElementById('auth').innerHTML=S.me?`<b>${esc(U(S.me).nick)}</b> <span class="chip">karar puanı: ${credits(U(S.me))}/100</span> <button class="b" onclick="S.me=null;F=null;save();R()">Çıkış</button>`:'';
+if(!S.me){if(!F)F={k:'login'};document.getElementById('m').innerHTML=formHTML()+(F.k==='login'?'<button class="b" onclick="F={k:\'reg\'};R()">Hesabın yok mu? Kayıt ol</button>':'');return}
+let h=formHTML();const me=U(S.me);
+if(tab==='k')h+=`<div class="bar"><button class="b p" onclick="F={k:'topic'};R()">Yeni konu aç</button><button class="b" id="aib" onclick="aiVote()">Claude oyunu işle</button><label style="margin:0"><input type="checkbox" style="width:auto" ${showHid?'checked':''} onchange="showHid=this.checked;R()"> Gizlenenleri göster</label></div>`+S.topics.filter(t=>!t.parent).map(t=>topicHTML(t,0)).join('');
+if(tab==='d'){h+=`<div class="c"><h3>Kim kime oy devretti?</h3>${graph()}<div class="row">${D.map(d=>`<span><span style="color:${col(d)}">●</span> ${d}</span>`).join('')}<span>Mavi dolu düğüm: yapay zekâ</span></div></div><div class="c"><h3>${esc(me.nick)} için delegasyon</h3><p class="sub">Alan bazlı devret, istediğin an geri al. Bir kişi en fazla 10 oy toplayabilir. Üst alana devretmek alt dalları da kapsar. Claude her alanda devir alabilir.</p><div class="row"><button class="b p" onclick="allAI()">${me.allAI?'Claude devrini geri al':'Her konuda Claude\'a devret'}</button></div>`+D.map(d=>{const opts=S.users.filter(u=>u.id!==me.id&&(u.ai||u.interests.some(i=>anc(d).includes(i))));const inc=S.users.filter(u=>u.del[d]===me.id).length;return`<div class="row"><b style="min-width:80px">${d}</b><select style="width:auto" onchange="deleg('${d}',this.value)"><option value="">Kendim oy veririm</option>${opts.map(u=>`<option value="${u.id}" ${me.del[d]===u.id?'selected':''}>${esc(u.nick)}</option>`).join('')}</select>${inc?chip('sana devreden: '+inc):''}</div>`}).join('')+'</div>'}
+if(tab==='l')h+=`<div class="bar"><button class="b" onclick="ver()">Zinciri doğrula</button><span id="vr"></span></div>`+[...S.ledger].reverse().map(e=>`<div class="c"><b>${e.type}</b> ${esc(e.msg)} <span class="sub">${e.t}</span><div class="mono">#${e.i} önceki ${e.prev.slice(0,10)} → hash ${e.hash}</div></div>`).join('');
+if(tab==='r')h+=`<div class="c"><h3>Değişmez kurallar</h3><ol><li>Hiçbir kayıt silinmez; "silme" yalnızca görünürlüğü kapatır.</li><li>Oy hakkını kaldıran, defteri silen veya kimlik ifşa eden öneriler yönetmelik kontrolünden geçemez.</li><li>Her değişiklik oylamayla yapılır; her karar defterde hash zinciriyle saklanır.</li><li>Temel haklara dokunan öneriler 2/3 ister.</li></ol></div><div class="c"><h3>Yönetmelik</h3><ul><li>Oylamaya yalnızca konunun alanıyla ilgilenenler katılır; etki alanı genişledikçe (sınıf → üni → herkes) yeter sayı artar (%30 / %50 / %60).</li><li>Oy ağırlığı 1 + devredilen oy, en fazla 11.</li><li>Karesel oylama: herkese haftada 100 karar puanı verilir. Bir konuda n oy vermek n²−1 puan tutar (ilk oy bedava). Tutkulu bir azınlık puanlarını tek konuda toplayıp ilgisiz bir çoğunluğa karşı ağırlık kazanabilir; puan sınırlı olduğu için herkes her konuda baskın olamaz. Yeter sayı (katılım) şiddetten etkilenmez.</li><li>Yeni konu 2 destekçi bulana kadar taslaktır; benzer başlık uyarısı verilir.</li><li>Her karar 90 gün sonra yeniden oylanır ve azınlık raporuyla saklanır.</li><li>Yapay zekâ grafta sınırlı ağırlıklı bir düğümdür; tüm devirleri görünür ve geri alınabilir.</li></ul></div><div class="c"><button class="b n" onclick="try{localStorage.removeItem('kd2')}catch(e){};seed();R()">Demo verisini sıfırla</button></div>`;
+document.getElementById('m').innerHTML=h}
+function ver(){let ok=1;S.ledger.forEach((e,i)=>{if(i&&e.prev!==S.ledger[i-1].hash)ok=0;if(e.hash!==H(e.prev+e.type+e.msg+e.t))ok=0});document.getElementById('vr').textContent=ok?'Zincir sağlam ✓':'Zincir bozuk!'}
+const vl=p=>Object.entries(p.votes).map(([id,v])=>`${v.pub||id===S.me?esc(U(id).nick):'anonim'} ${v.v?'✓':'✗'}${v.n>1?'×'+v.n:''}`).join(' · ')||'henüz yok';
+function comHTML(t){const c=t.cm||[];return`<details ${c.length?'open':''}><summary>Yorumlar (${c.length})</summary>${c.map(m=>`<div class="mr"><b>${m.pub||m.by===S.me?esc(U(m.by).nick):'Anonim'}</b>${m.by===S.me&&!m.pub?' (sen, anonim)':''} <span class="sub">${m.t}</span><div>${esc(m.x)}</div></div>`).join('')}<input id="cm${t.id}" placeholder="Yorumun"><div class="row"><label style="margin:0"><input type="checkbox" id="cp${t.id}" checked style="width:auto"> Adımla görünsün</label><button class="b" onclick="comment('${t.id}')">Yorum yaz</button></div></details>`}
+function comment(id){const t=T(id),x=document.getElementById('cm'+id).value.trim();if(!x)return;(t.cm=t.cm||[]).push({by:S.me,x,pub:document.getElementById('cp'+id).checked,t:now()});add('YORUM',t.title+': yeni yorum');save();R()}
+function allAI(){const u=U(S.me);u.allAI=!u.allAI;add('DELEGASYON',`${u.nick} → Claude (her konu ${u.allAI?'açık':'kapalı'})`);save();R()}
+// === Gerçek yapay zekâ oyu (sunucu üzerinden), sunucu yoksa kural tabanlı yedek ===
+async function aiVote(){const btn=document.getElementById('aib');if(btn){btn.disabled=true;btn.textContent='Claude düşünüyor…'}
+for(const t of S.topics){for(const p of t.props.filter(p=>p.status==='bekliyor'&&!p.votes.u5)){if(!voters(t).W.u5)continue;let r;
+try{r=await jpost('/ai/vote',{topic_title:t.title,topic_text:t.text,domain:t.domain,proposal_type:p.type,payload:p.payload,constitutional:p.anayasal})}
+catch(e){r={vote:!(p.anayasal||p.type==='delete'),reason:'Sunucuya ulaşılamadı, kural tabanlı yedek kullanıldı'}}
+p.votes.u5={v:!!r.vote,r:r.reason||'gerekçe yok',pub:true};add('OY','claude-ai oy verdi ('+p.id+')');resolve(p,t)}}
+save();R()}
+document.querySelector('nav').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;R()}};R();
+</script></body></html>
